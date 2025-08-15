@@ -1,113 +1,131 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
-import { toast } from "react-toastify";
 import { Carousel } from "react-responsive-carousel";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 
 export default function BorrowBook() {
   const [books, setBooks] = useState([]);
+  const [message, setMessage] = useState("");
+  const [borrowed, setBorrowed] = useState([]); // store borrowed transactions
 
+  const gradients = [
+    "linear-gradient(to bottom, #001f3f, #004080)",
+    "linear-gradient(to bottom, #ff7e5f, #feb47b)",
+    "linear-gradient(to bottom, #43cea2, #185a9d)",
+    "linear-gradient(to bottom, #ff6a00, #ee0979)",
+    "linear-gradient(to bottom, #8360c3, #2ebf91)",
+  ];
+
+  // Fetch available books
   useEffect(() => {
-    const fetchBooks = async () => {
-      try {
-        const res = await api.get("/books/", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-        });
-        setBooks(res.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchBooks();
+    api.get("/books/")
+      .then(res => setBooks(res.data))
+      .catch(err => console.log(err));
   }, []);
 
-  const handleBorrow = async (id) => {
+  // Fetch borrowed transactions
+  useEffect(() => {
+    api.get("/transactions/borrowed/")
+      .then(res => setBorrowed(res.data))
+      .catch(err => console.log(err));
+  }, []);
+
+  const handleBorrow = async (bookId) => {
     try {
-      await api.post(
-        "/borrow/",
-        { book_id: id },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } }
+      const res = await api.post(`/borrow/`, { book_id: bookId });
+      setMessage("Book borrowed successfully!");
+
+      // Update available books
+      setBooks(prev =>
+        prev.map(book => book.id === bookId ? { ...book, available_copies: book.available_copies - 1 } : book)
       );
-      toast.success("Book borrowed successfully!");
+
+      // Add to borrowed list
+      setBorrowed(prev => [...prev, res.data]);
+
     } catch (err) {
-      toast.error("Failed to borrow book. Maybe it's already borrowed or you lack permission.");
+      setMessage(err.response?.data?.error || "Failed to borrow book.");
     }
   };
 
-  const slides = [
-    "https://thumbs.dreamstime.com/b/african-college-students-cheerful-using-laptop-together-56055175.jpg?w=768",
-    "https://thumbs.dreamstime.com/b/eacher-children-looking-bird-s-nest-6081771.jpg?w=768",
-    "https://thumbs.dreamstime.com/b/diversity-people-reading-book-inspiration-concept-64705552.jpg?w=1400",
-  ];
-
   return (
-    <div style={{ position: "relative", minHeight: "100vh" }}>
-      <Carousel
-        showThumbs={false}
-        showStatus={false}
-        infiniteLoop
-        autoPlay
-        interval={5000}
-        dynamicHeight={false}
-      >
-        {slides.map((img, idx) => (
-          <div key={idx}>
-            <img src={img} alt={`slide-${idx}`} style={{ objectFit: "cover", height: "100vh" }} />
-          </div>
-        ))}
-      </Carousel>
-
+    <div
+      style={{
+        position: "relative",
+        minHeight: "100vh",
+        padding: "20px",
+        backgroundImage: "url('https://images.unsplash.com/photo-1524995997946-a1c2e315a42f')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
       <div
         style={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          minHeight: "100vh",
-          background: "rgba(0,0,0,0.5)",
-          padding: "40px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          color: "#fff",
+          top: 0, left: 0, width: "100%", height: "100%",
+          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 0
         }}
-      >
-        <h1 style={{ marginBottom: "30px" }}>📖 Borrow Books</h1>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "20px" }}>
-          {books.map((book) => (
+      ></div>
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <h2 style={{ textAlign: "center", marginBottom: "20px", color: "#fff" }}>Borrow Books</h2>
+        {message && <p style={{ textAlign: "center", color: "yellow" }}>{message}</p>}
+
+        <Carousel
+          showThumbs={false}
+          showStatus={false}
+          infiniteLoop
+          emulateTouch
+          centerMode
+          centerSlidePercentage={30}
+          dynamicHeight={false}
+        >
+          {books.map((book, idx) => (
             <div
               key={book.id}
               style={{
-                background: "#fff",
-                color: "#000",
+                background: gradients[idx % gradients.length],
+                color: "#fff",
                 padding: "15px",
                 borderRadius: "8px",
                 width: "200px",
                 textAlign: "center",
-                boxShadow: "0px 0px 10px rgba(0,0,0,0.3)",
+                boxShadow: "0px 0px 10px rgba(0,0,0,0.5)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                minHeight: "350px",
+                justifyContent: "space-between",
               }}
             >
-              <h3>{book.title}</h3>
-              <p>{book.author}</p>
-              <p>ISBN: {book.isbn}</p>
-              <p>Available: {book.available_copies}</p>
+              <img
+                src={book.cover || "https://via.placeholder.com/150x220.png?text=Book+Cover"}
+                alt={book.title}
+                style={{ width: "150px", height: "220px", objectFit: "cover", borderRadius: "5px" }}
+              />
+              <div>
+                <h3>{book.title}</h3>
+                <p>{book.author}</p>
+                <p>Available: {book.available_copies}</p>
+              </div>
               <button
+                disabled={book.available_copies === 0}
                 onClick={() => handleBorrow(book.id)}
                 style={{
-                  marginTop: "10px",
-                  padding: "8px 15px",
-                  background: "#27ae60",
+                  padding: "8px 12px",
+                  background: book.available_copies === 0 ? "#aaa" : "#27ae60",
                   color: "#fff",
                   border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
+                  borderRadius: "5px",
+                  cursor: book.available_copies === 0 ? "not-allowed" : "pointer",
+                  marginTop: "10px",
                 }}
               >
                 Borrow
               </button>
             </div>
           ))}
-        </div>
+        </Carousel>
       </div>
     </div>
   );

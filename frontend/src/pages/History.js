@@ -21,9 +21,9 @@ export default function History() {
   }, []);
 
   const slides = [
-    "https://images.unsplash.com/photo-1581091870620-0ec2d1d3513d?auto=format&fit=crop&w=1500&q=80",
-    "https://images.unsplash.com/photo-1581091012184-6fda4f5a7bc8?auto=format&fit=crop&w=1500&q=80",
-    "https://images.unsplash.com/photo-1596495577886-5d41c111e399?auto=format&fit=crop&w=1500&q=80",
+    "https://thumbs.dreamstime.com/b/african-students-library-29022118.jpg?w=768",
+    "https://thumbs.dreamstime.com/b/diversity-people-reading-book-inspiration-concept-64705552.jpg?w=1400",
+    "https://img.freepik.com/free-vector/school-library-scene-with-happy-children_1308-79813.jpg?t=st=1755262559~exp=1755266159~hmac=b5591cda87973bf976df15f582d9958eb6ab2b97d9d94305c3d6f79bb34f8b5b&w=1060",
   ];
 
   return (

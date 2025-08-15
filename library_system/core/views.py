@@ -15,15 +15,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-
-
-# Register
-# class RegisterAPI(generics.CreateAPIView):
-#     queryset = User.objects.all()
-#     serializer_class = RegisterSerializerfrom django.contrib.auth.models import User
 from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from django.contrib.auth.password_validation import validate_password
 from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
@@ -39,34 +31,62 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from background_task import background
 
-# @background(schedule=60)  # run after 60 seconds (for testing)
-# def send_due_reminders():
-#     today = date.today()
-#     reminder_date = today + timedelta(days=2)  # 2 days before due
-#     transactions = Transaction.objects.filter(return_date__isnull=True, due_date=reminder_date)
-    
-#     for t in transactions:
-#         send_mail(
-#             subject=f"Reminder: Book Due Soon - {t.book.title}",
-#             message=f"Hello {t.member.user.username},\n\n"
-#                     f"Your borrowed book '{t.book.title}' is due on {t.due_date}.\n"
-#                     "Please return it to avoid fines.",
-#             from_email="library@yourdomain.com",
-#             recipient_list=[t.member.user.email],
-#         )
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from datetime import date, timedelta
+from .models import Book, Member, Transaction
 
-# @receiver(post_save, sender=Transaction)
-# def send_borrow_email(sender, instance, created, **kwargs):
-#     if created:
-#         send_mail(
-#             subject=f"Book Borrowed: {instance.book.title}",
-#             message=f"Hello {instance.member.user.username},\n\n"
-#                     f"You borrowed '{instance.book.title}' by {instance.book.author}.\n"
-#                     f"Due Date: {instance.due_date}\n\n"
-#                     "Please return the book on time to avoid fines.",
-#             from_email="library@yourdomain.com",
-#             recipient_list=[instance.member.user.email],
-#         )
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import AllowAny
+from django.contrib.auth import authenticate
+
+from rest_framework.generics import ListAPIView
+from .serializers import TransactionDetailSerializer
+from django.utils import timezone
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def borrowed_transactions(request):
+    user = request.user
+    member = get_object_or_404(Member, user=user)
+    transactions = Transaction.objects.filter(member=member, return_date__isnull=True)
+
+    serializer = TransactionDetailSerializer(transactions, many=True)
+    return Response(serializer.data)
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def borrow_book(request, book_id):
+    user = request.user
+    member = get_object_or_404(Member, user=user)
+    book = get_object_or_404(Book, id=book_id)
+
+    # Check availability
+    if book.available_copies <= 0:
+        return Response({"error": "Book not available"}, status=400)
+
+    # Check member's max_books
+    borrowed_count = Transaction.objects.filter(member=member, return_date__isnull=True).count()
+    if borrowed_count >= member.max_books:
+        return Response({"error": "Reached max borrowed books"}, status=400)
+
+    # Create transaction
+    Transaction.objects.create(
+        member=member,
+        book=book,
+        borrow_date=date.today(),
+        due_date=date.today() + timedelta(days=14)
+    )
+
+    # Reduce available copies
+    book.available_copies -= 1
+    book.save()
+
+    return Response({"success": "Book borrowed successfully"})
 
 
 class RegisterAPI(APIView):
@@ -95,57 +115,6 @@ class RegisterAPI(APIView):
         Member.objects.create(user=user)  # Also create member record
         return Response({"message": "Account created successfully"}, status=status.HTTP_201_CREATED)
 
-
-# Login
-# class LoginAPIView(APIView):
-#     def post(self, request):
-#         username = request.data.get("username")
-#         password = request.data.get("password")
-
-#         user = authenticate(username=username, password=password)
-#         if user is None:
-#             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-
-#         # Generate JWT tokens
-#         refresh = RefreshToken.for_user(user)
-
-#         return Response({
-#             "refresh": str(refresh),
-#             "access": str(refresh.access_token),
-#             "username": user.username,
-#             "is_staff": user.is_staff  # ✅ Added this
-#         })
-
-# core/views.py
-
-
-# class LoginAPIView(APIView):
-#     permission_classes = [AllowAny]
-
-#     def post(self, request):
-#         username = request.data.get("username")
-#         password = request.data.get("password")
-#         user = authenticate(username=username, password=password)
-#         if user:
-#             token, _ = Token.objects.get_or_create(user=user)
-#             return Response({
-#                 "token": token.key,
-#                 "username": user.username,
-#                 "is_staff": user.is_staff
-#             })
-#         return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import AllowAny
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from django.contrib.auth import authenticate
-#staff only views
-from rest_framework.permissions import IsAdminUser
-from rest_framework.generics import ListAPIView
-from .serializers import TransactionDetailSerializer
-from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework.response import Response
 
 # List all borrowed books (active transactions)
 class StaffBorrowedBooksAPI(ListAPIView):

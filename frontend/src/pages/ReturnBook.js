@@ -1,113 +1,134 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
-import { toast } from "react-toastify";
 import { Carousel } from "react-responsive-carousel";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 
 export default function ReturnBook() {
   const [transactions, setTransactions] = useState([]);
+  const [message, setMessage] = useState("");
 
+  const gradients = [
+    "linear-gradient(to bottom, #001f3f, #004080)",
+    "linear-gradient(to bottom, #ff7e5f, #feb47b)",
+    "linear-gradient(to bottom, #43cea2, #185a9d)",
+    "linear-gradient(to bottom, #ff6a00, #ee0979)",
+    "linear-gradient(to bottom, #8360c3, #2ebf91)",
+  ];
+
+  // Fetch borrowed transactions
   useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const res = await api.get("/transactions/", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-        });
-        setTransactions(res.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchTransactions();
+    api.get("/transactions/borrowed/")
+      .then(res => setTransactions(res.data))
+      .catch(err => console.log(err));
   }, []);
 
-  const handleReturn = async (id) => {
+  // Handle returning a book
+  const handleReturn = async (transactionId) => {
     try {
-      await api.post(
-        "/return/",
-        { transaction_id: id },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } }
-      );
-      toast.success("Book returned successfully!");
+      const res = await api.post(`/return/`, { transaction_id: transactionId });
+      setMessage(res.data.message + (res.data.fine ? ` | Fine: ${res.data.fine}` : ""));
+      // Refresh transactions after return
+      setTransactions(prev => prev.filter(t => t.id !== transactionId));
     } catch (err) {
-      toast.error("Failed to return book. Maybe already returned.");
+      setMessage(err.response?.data?.error || "Failed to return book.");
     }
   };
 
-  const slides = [
-    "https://www.freepik.com/free-photo/young-student-learning-library_21138935.htm#fromView=keyword&page=1&position=1&uuid=38da8d4a-c950-43ce-ab89-3a6b78fa9925&query=African+Student+Library",
-    "https://www.freepik.com/premium-ai-image/african-american-male-student-searching-through-books-library-shelf_369888784.htm#fromView=keyword&page=1&position=8&uuid=38da8d4a-c950-43ce-ab89-3a6b78fa9925&query=African+Student+Library",
-    "https://www.freepik.com/free-photo/young-student-working-assignment_22377289.htm#fromView=keyword&page=1&position=0&uuid=38da8d4a-c950-43ce-ab89-3a6b78fa9925&query=African+Student+Library",
-  ];
+  // Handle paying a fine
+  const handlePayFine = async (transactionId) => {
+    try {
+      const res = await api.post("/pay-fine/", { transaction_id: transactionId });
+      setMessage(res.data.message);
+      // Update the transaction fine to 0 locally
+      setTransactions(prev =>
+        prev.map(t => t.id === transactionId ? { ...t, fine: 0 } : t)
+      );
+    } catch (err) {
+      setMessage(err.response?.data?.error || "Failed to pay fine.");
+    }
+  };
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh" }}>
-      <Carousel
-        showThumbs={false}
-        showStatus={false}
-        infiniteLoop
-        autoPlay
-        interval={5000}
-        dynamicHeight={false}
-      >
-        {slides.map((img, idx) => (
-          <div key={idx}>
-            <img src={img} alt={`slide-${idx}`} style={{ objectFit: "cover", height: "100vh" }} />
-          </div>
-        ))}
-      </Carousel>
+    <div style={{
+      position: "relative",
+      minHeight: "100vh",
+      padding: "20px",
+      backgroundImage: "url('https://images.unsplash.com/photo-1524995997946-a1c2e315a42f')",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    }}>
+      {/* Dark overlay */}
+      <div style={{
+        position: "absolute",
+        top: 0, left: 0, width: "100%", height: "100%",
+        backgroundColor: "rgba(0,0,0,0.5)", zIndex: 0
+      }}></div>
 
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          minHeight: "100vh",
-          background: "rgba(0,0,0,0.5)",
-          padding: "40px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          color: "#fff",
-        }}
-      >
-        <h1 style={{ marginBottom: "30px" }}>🔄 Return Books</h1>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "20px" }}>
-          {transactions.map((t) => (
-            <div
-              key={t.id}
-              style={{
-                background: "#fff",
-                color: "#000",
+      {/* Content */}
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <h2 style={{ textAlign: "center", marginBottom: "20px", color: "#fff" }}>Return Books</h2>
+        {message && <p style={{ textAlign: "center", color: "yellow" }}>{message}</p>}
+
+        <Carousel
+          showThumbs={false}
+          showStatus={false}
+          infiniteLoop
+          emulateTouch
+          centerMode
+          centerSlidePercentage={30}
+          dynamicHeight={false}
+        >
+          {transactions.map((item, idx) => {
+            const book = item.book;
+            if (!book) return null;
+
+            return (
+              <div key={item.id} style={{
+                background: gradients[idx % gradients.length],
+                color: "#fff",
                 padding: "15px",
                 borderRadius: "8px",
                 width: "200px",
                 textAlign: "center",
-                boxShadow: "0px 0px 10px rgba(0,0,0,0.3)",
-              }}
-            >
-              <h3>{t.book.title}</h3>
-              <p>{t.book.author}</p>
-              <p>Borrowed: {t.borrow_date}</p>
-              <p>Due: {t.due_date}</p>
-              <button
-                onClick={() => handleReturn(t.id)}
-                style={{
-                  marginTop: "10px",
-                  padding: "8px 15px",
-                  background: "#e74c3c",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                }}
-              >
-                Return
-              </button>
-            </div>
-          ))}
-        </div>
+                boxShadow: "0px 0px 10px rgba(0,0,0,0.5)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                minHeight: "380px",
+                justifyContent: "space-between",
+              }}>
+                <img
+                  src={book.cover || "https://via.placeholder.com/150x220.png?text=Book+Cover"}
+                  alt={book.title}
+                  style={{ width: "150px", height: "220px", objectFit: "cover", borderRadius: "5px" }}
+                />
+                <div>
+                  <h3>{book.title}</h3>
+                  <p>{book.author}</p>
+                  <p>Due: {item.due_date}</p>
+                  {item.fine > 0 && <p style={{ color: "#ff6666" }}>Fine: {item.fine}</p>}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <button onClick={() => handleReturn(item.id)} style={{
+                    padding: "8px 12px", background: "#27ae60",
+                    color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer"
+                  }}>
+                    Return
+                  </button>
+
+                  {item.fine > 0 &&
+                    <button onClick={() => handlePayFine(item.id)} style={{
+                      padding: "8px 12px", background: "#e67e22",
+                      color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer"
+                    }}>
+                      Pay Fine
+                    </button>
+                  }
+                </div>
+              </div>
+            );
+          })}
+        </Carousel>
       </div>
     </div>
   );
