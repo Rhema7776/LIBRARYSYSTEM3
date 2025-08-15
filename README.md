@@ -14,7 +14,7 @@ A full-stack library management system with Django backend and React frontend.
 ### Backend
 - Python 3.x, Django, Django REST Framework
 - cd library_system (on one terminal)
-- Install requirements: `pip install -r rquirements.txt`
+- Install requirements: `pip install -r requirements.txt`
 - Run migrations:`python manage.py makemigrations`, `python manage.py migrate`
 - Run server: `python manage.py runserver`
 

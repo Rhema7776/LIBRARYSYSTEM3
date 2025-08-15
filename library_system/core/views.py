@@ -10,23 +10,185 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 # from .serializers import TransactionSerializer, TransactionDetailSerializer
 from django.utils import timezone
 from datetime import timedelta
+from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 
 
 # Register
-class RegisterAPI(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = RegisterSerializer
+# class RegisterAPI(generics.CreateAPIView):
+#     queryset = User.objects.all()
+#     serializer_class = RegisterSerializerfrom django.contrib.auth.models import User
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from django.contrib.auth.password_validation import validate_password
+from rest_framework.exceptions import ValidationError
+from rest_framework.views import APIView
+from rest_framework import generics
+from django.contrib.auth.models import User
+from .serializers import RegisterSerializer
+
+from rest_framework import status
+
+from .models import Member
+from django.contrib.auth import authenticate
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from background_task import background
+
+# @background(schedule=60)  # run after 60 seconds (for testing)
+# def send_due_reminders():
+#     today = date.today()
+#     reminder_date = today + timedelta(days=2)  # 2 days before due
+#     transactions = Transaction.objects.filter(return_date__isnull=True, due_date=reminder_date)
+    
+#     for t in transactions:
+#         send_mail(
+#             subject=f"Reminder: Book Due Soon - {t.book.title}",
+#             message=f"Hello {t.member.user.username},\n\n"
+#                     f"Your borrowed book '{t.book.title}' is due on {t.due_date}.\n"
+#                     "Please return it to avoid fines.",
+#             from_email="library@yourdomain.com",
+#             recipient_list=[t.member.user.email],
+#         )
+
+# @receiver(post_save, sender=Transaction)
+# def send_borrow_email(sender, instance, created, **kwargs):
+#     if created:
+#         send_mail(
+#             subject=f"Book Borrowed: {instance.book.title}",
+#             message=f"Hello {instance.member.user.username},\n\n"
+#                     f"You borrowed '{instance.book.title}' by {instance.book.author}.\n"
+#                     f"Due Date: {instance.due_date}\n\n"
+#                     "Please return the book on time to avoid fines.",
+#             from_email="library@yourdomain.com",
+#             recipient_list=[instance.member.user.email],
+#         )
+
+
+class RegisterAPI(APIView):
+    permission_classes = [AllowAny]  # ✅ crucial
+
+    def post(self, request):
+        username = request.data.get("username", "").strip()
+        email = request.data.get("email", "").strip()
+        password = request.data.get("password", "")
+
+        if not username:
+            return Response({"error": "Username is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already in use"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(password)
+        except ValidationError as e:
+            return Response({"error": list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(username=username, email=email, password=password)
+        Member.objects.create(user=user)  # Also create member record
+        return Response({"message": "Account created successfully"}, status=status.HTTP_201_CREATED)
+
 
 # Login
-class LoginAPI(APIView):
+# class LoginAPIView(APIView):
+#     def post(self, request):
+#         username = request.data.get("username")
+#         password = request.data.get("password")
+
+#         user = authenticate(username=username, password=password)
+#         if user is None:
+#             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+#         # Generate JWT tokens
+#         refresh = RefreshToken.for_user(user)
+
+#         return Response({
+#             "refresh": str(refresh),
+#             "access": str(refresh.access_token),
+#             "username": user.username,
+#             "is_staff": user.is_staff  # ✅ Added this
+#         })
+
+# core/views.py
+
+
+# class LoginAPIView(APIView):
+#     permission_classes = [AllowAny]
+
+#     def post(self, request):
+#         username = request.data.get("username")
+#         password = request.data.get("password")
+#         user = authenticate(username=username, password=password)
+#         if user:
+#             token, _ = Token.objects.get_or_create(user=user)
+#             return Response({
+#                 "token": token.key,
+#                 "username": user.username,
+#                 "is_staff": user.is_staff
+#             })
+#         return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.contrib.auth import authenticate
+#staff only views
+from rest_framework.permissions import IsAdminUser
+from rest_framework.generics import ListAPIView
+from .serializers import TransactionDetailSerializer
+from django.utils import timezone
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+# List all borrowed books (active transactions)
+class StaffBorrowedBooksAPI(ListAPIView):
+    queryset = Transaction.objects.filter(return_date__isnull=True)
+    serializer_class = TransactionDetailSerializer
+    permission_classes = [IsAdminUser]
+
+# Send reminder alert (dummy implementation)
+class StaffSendAlertAPI(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, transaction_id):
+        try:
+            transaction = Transaction.objects.get(id=transaction_id)
+        except Transaction.DoesNotExist:
+            return Response({"error": "Transaction not found"}, status=404)
+
+        # Example: Mark alert sent
+        transaction.alert_sent = True
+        transaction.save()
+
+        # In future: integrate real email notification
+        return Response({"message": f"Reminder sent to {transaction.member.user.username}"})
+
+
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         username = request.data.get("username")
         password = request.data.get("password")
         user = authenticate(username=username, password=password)
+
         if user:
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({'token': token.key})
-        return Response({"error": "Invalid Credentials"}, status=400)
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+                "username": user.username,
+                "is_staff": user.is_staff
+            })
+        return Response({"error": "Invalid credentials"}, status=400)
+
 
 # Book List
 class BookListAPI(generics.ListAPIView):

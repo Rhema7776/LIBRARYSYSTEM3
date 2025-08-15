@@ -2,6 +2,9 @@ from django.db import models
 from django.contrib.auth.models import User
 from datetime import timedelta, date
 from django.core.exceptions import ValidationError
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.core.mail import send_mail
 
 class Book(models.Model):
     title = models.CharField(max_length=200)
@@ -26,7 +29,7 @@ class Transaction(models.Model):
     return_date = models.DateField(null=True, blank=True)
     due_date = models.DateField()
     fine = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
-    extended = models.BooleanField(default=False)  # ← NEW
+    extended = models.BooleanField(default=False)
 
     def clean(self):
         # Prevent return date before borrow date
