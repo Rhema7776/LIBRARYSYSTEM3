@@ -19,7 +19,7 @@ A full-stack library management system with Django backend and React frontend.
 - Run server: `python manage.py runserver`
 
 ### Frontend
-cd frontend (on another terminal)
+- cd frontend (on another terminal)
 - Node.js, React.js, Tailwind CSS (setup pending)
 - Install dependencies: `yarn install` or `npm install`
 - Start frontend: `yarn start` or `npm start`

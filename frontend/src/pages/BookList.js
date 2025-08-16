@@ -86,7 +86,7 @@ export default function BookList() {
             >
               <img
                 
-                src={book.cover && book.cover.length > 0 ? book.cover : "https://www.freepik.com/free-photo/book-inside-autumn-leaves-frame_2618510.htm#fromView=keyword&page=3&position=3&uuid=d8eb8443-50d5-4102-a789-2df00d1b663d&query=Book+Cover+Placeholderhttps://www.freepik.com/free-photo/book-inside-autumn-leaves-frame_2618510.htm#fromView=keyword&page=3&position=4&uuid=ff6b5bae-0fdb-4c3b-8975-b13fc29ceb41&query=Book+Cover+Placeholderhttps://www.freepik.com/free-photo/blank-white-mock-up-book_3987840.htm#fromView=keyword&page=3&position=6&uuid=ff6b5bae-0fdb-4c3b-8975-b13fc29ceb41&query=Book+Cover+Placeholder"}
+                src={book.cover && book.cover.length > 0 ? book.cover : "https://static.vecteezy.com/system/resources/thumbnails/046/861/693/small/a-white-book-cover-mockup-free-png.png"}
                 alt={book.title}
                 style={{ width: "150px", height: "220px", objectFit: "cover", borderRadius: "5px" }} 
               />

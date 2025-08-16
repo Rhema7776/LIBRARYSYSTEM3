@@ -98,7 +98,7 @@ export default function ReturnBook() {
                 justifyContent: "space-between",
               }}>
                 <img
-                  src={book.cover || "https://via.placeholder.com/150x220.png?text=Book+Cover"}
+                  src={book.cover || "https://static.vecteezy.com/system/resources/thumbnails/046/861/693/small/a-white-book-cover-mockup-free-png.png"}
                   alt={book.title}
                   style={{ width: "150px", height: "220px", objectFit: "cover", borderRadius: "5px" }}
                 />
